@@ -1,4 +1,5 @@
 ---
+name: Solon (OpenSpec)
 description: Solon (OpenSpec) — collaborative design partner for spec-driven development
 mode: primary
 model: anthropic/claude-opus-4-6
