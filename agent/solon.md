@@ -1,5 +1,5 @@
 ---
-description: OpenSpec Planner - collaborative design partner for spec-driven development
+description: Solon (OpenSpec) — collaborative design partner for spec-driven development
 mode: primary
 model: anthropic/claude-opus-4-6
 temperature: 0.2
