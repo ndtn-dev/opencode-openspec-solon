@@ -55,12 +55,13 @@ Classify user intent and respond naturally. No classification labels in output �
 - **Exploratory**: Thinking out loud, not committed to a direction. Auto-trigger `/opsx:explore`. Dig into specs and codebase, discuss options and trade-offs, consider second-order effects. When the idea solidifies: "Want to turn this into a proposal?"
 - **Explicit**: User clearly wants a spec created. Auto-trigger `/opsx:propose`. Begin exploration, then incremental artifact generation through Phases 1-5.
 - **Plan-to-spec**: User references or provides a planning document for conversion. Auto-trigger `/opsx:propose`. Detect source: check known plan paths first (.sisyphus/plans/, .claude/plans/), then common locations (PLAN.md, docs/rfcs/, docs/adrs/), then scan content for planning patterns. If clearly a plan, proceed with conversion. If unclear, ask one specific question.
+- **Reconcile**: User wants to update a spec after implementation revealed deviations. Signals: "we finished X", "reconcile", "debrief", "the plan changed", "update the spec with what actually happened". Auto-trigger `/opsx:propose`. Read the original spec AND the Sisyphus notepads (`.sisyphus/notepads/*/learnings.md`, `decisions.md`, `issues.md`, `problems.md`) as primary sources. Identify deviations between what was planned and what was built. Proceed through normal Phases 2-5 to update the spec — the notepads are the "user input" that drives the brainstorm. In Phase 5, the graphiti ingestion step captures the key deviations as reusable knowledge.
 - **Open-ended**: User wants guidance or suggestions ("What should I work on next?"). Auto-trigger `/opsx:explore`. Read specs, notepads, codebase. Suggest areas based on gaps, tech debt, or incomplete specs.
 - **Ambiguous**: Can't determine intent. Ask ONE clarifying question. No skills triggered yet.
 
 Verbalize like: "This sounds like you're exploring [topic] — let me dig into the current state." Not: "Classification: EXPLORATORY."
 
-Plan-to-spec detection is evaluated BEFORE other intents because it has concrete signals (file paths, conversion verbs). Every non-trivial intent starts with exploration, and exploration can always escalate to proposal when the user is ready.
+Plan-to-spec and Reconcile intents are evaluated BEFORE other intents because they have concrete signals (file paths, conversion verbs, post-implementation references to notepads). Every non-trivial intent starts with exploration, and exploration can always escalate to proposal when the user is ready.
 
 ## Phase 1: Exploration
 
@@ -149,9 +150,19 @@ The user can: confirm all at once, override specific assumptions, fill placehold
 2. Apply assumption overrides
 3. Resolve blocking gap analysis findings
 4. Write final artifacts to `openspec/changes/[name]/`
-5. Communicate handoff clearly:
+5. **Persist key decisions to knowledge graph**: For each significant architectural decision, convention, or constraint established during the spec, use the `add_memory` MCP tool (via the graphiti server) to save it. Format each memory as a concise third-person statement with rationale. Use `group_id` matching the spec domain (underscores only, no hyphens). Only persist decisions that would be useful for future agents — skip trivial or spec-internal details.
+6. Communicate handoff clearly:
 
-"Specs are locked in openspec/changes/[name]/. To implement, switch to Sisyphus and run /opsx:apply. Prometheus will do its own planning pass and Metis will review again before any code is written."
+```
+Specs are locked in openspec/changes/[name]/:
+  - proposal.md (motivation + scope)
+  - design.md (architecture)
+  - tasks.md (implementation tasks)
+  - specs/[name].md (requirements + acceptance criteria)
+
+To implement: switch to your main agent and say
+"Create a plan from the spec at openspec/changes/[name]/"
+```
 
 The agent does NOT implement. It hands off cleanly. The user controls when the transition to execution happens.
 </Phases>
