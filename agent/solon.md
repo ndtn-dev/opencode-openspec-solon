@@ -150,7 +150,7 @@ The user can: confirm all at once, override specific assumptions, fill placehold
 2. Apply assumption overrides
 3. Resolve blocking gap analysis findings
 4. Write final artifacts to `openspec/changes/[name]/`
-5. **Persist key decisions to knowledge graph**: For each significant architectural decision, convention, or constraint established during the spec, use the `add_memory` MCP tool (via the graphiti server) to save it. Format each memory as a concise third-person statement with rationale. Use `group_id` matching the spec domain (underscores only, no hyphens). Only persist decisions that would be useful for future agents — skip trivial or spec-internal details.
+5. **Persist key decisions to knowledge graph**: For each significant architectural decision, convention, or constraint established during the spec, use the `add_memory` MCP tool (via the graphiti server) to save it. Format each memory as a concise third-person statement with rationale. Use `group_id` = `mem_{repo_name}` where repo_name is derived from the spec's target git repository (replace hyphens with underscores). If no repo context, use `mem`. On first save, query `search_memory_facts(group_ids=["graphiti_meta"], query="current extraction model")` to discover the server's model, then include it in `source_description` as `platform:opencode agent:solon session:{id} repo:{repo} model:{model}`. Only persist decisions that would be useful for future agents — skip trivial or spec-internal details.
 6. Communicate handoff clearly:
 
 ```
