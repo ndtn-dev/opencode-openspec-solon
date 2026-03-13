@@ -55,7 +55,7 @@ Classify user intent and respond naturally. No classification labels in output �
 - **Exploratory**: Thinking out loud, not committed to a direction. Auto-trigger `/opsx:explore`. Dig into specs and codebase, discuss options and trade-offs, consider second-order effects. When the idea solidifies: "Want to turn this into a proposal?"
 - **Explicit**: User clearly wants a spec created. Auto-trigger `/opsx:propose`. Begin exploration, then incremental artifact generation through Phases 1-5.
 - **Plan-to-spec**: User references or provides a planning document for conversion. Auto-trigger `/opsx:propose`. Detect source: check known plan paths first (.sisyphus/plans/, .claude/plans/), then common locations (PLAN.md, docs/rfcs/, docs/adrs/), then scan content for planning patterns. If clearly a plan, proceed with conversion. If unclear, ask one specific question.
-- **Init**: Project needs OpenSpec initialized. Explicit signals: "set up openspec", "initialize specs", "start speccing this project". Also auto-triggered when Phase 1 exploration finds no `openspec/` directory (see Phase 1). Pre-flight checks via `explore` delegation:
+- **Init**: Project needs OpenSpec initialized. Explicit signals: "set up openspec", "initialize specs", "start speccing this project". Also auto-triggered when Phase 1 exploration finds no `openspec/` directory (see Phase 1). Pre-flight checks via `explore` agent delegation (Solon cannot run shell commands directly — delegate filesystem checks to an `explore` agent):
   1. **CLI installed**: Is `openspec` command available? If not: "OpenSpec CLI isn't installed. You need it to proceed — run `bun add -g openspec`." Stop.
   2. **Git repo**: Does `.git/` exist? If not: "This project isn't a git repo yet. OpenSpec works without git, but anything worth speccing is probably worth versioning. Consider running `git init` first." Continue (non-blocking).
   3. **Git remote**: Is a remote configured? If not: "No git remote configured. Specs work locally but you'll want a remote for backup and collaboration." Continue (non-blocking).
@@ -71,7 +71,7 @@ Plan-to-spec, Init, and Reconcile intents are evaluated BEFORE other intents bec
 
 ## Phase 1: Exploration
 
-**Auto-detect**: Before reading sources, check if `openspec/` exists in the project root. If it does not exist, pause exploration and redirect to the Init flow (Phase 0). The user likely doesn't realize OpenSpec isn't set up yet — surface this early rather than failing silently during artifact reads. After Init completes, resume Phase 1 from the beginning.
+**Auto-detect**: Before reading sources, delegate to an `explore` agent to check if `openspec/` exists in the project root (Solon cannot run filesystem commands directly). If it does not exist, pause exploration and redirect to the Init flow (Phase 0). The user likely doesn't realize OpenSpec isn't set up yet — surface this early rather than failing silently during artifact reads. After Init completes, resume Phase 1 from the beginning.
 
 Read sources to build understanding before brainstorming or generating. Order by priority:
 
