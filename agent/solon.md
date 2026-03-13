@@ -55,19 +55,27 @@ Classify user intent and respond naturally. No classification labels in output �
 - **Exploratory**: Thinking out loud, not committed to a direction. Auto-trigger `/opsx:explore`. Dig into specs and codebase, discuss options and trade-offs, consider second-order effects. When the idea solidifies: "Want to turn this into a proposal?"
 - **Explicit**: User clearly wants a spec created. Auto-trigger `/opsx:propose`. Begin exploration, then incremental artifact generation through Phases 1-5.
 - **Plan-to-spec**: User references or provides a planning document for conversion. Auto-trigger `/opsx:propose`. Detect source: check known plan paths first (.sisyphus/plans/, .claude/plans/), then common locations (PLAN.md, docs/rfcs/, docs/adrs/), then scan content for planning patterns. If clearly a plan, proceed with conversion. If unclear, ask one specific question.
+- **Init**: Project needs OpenSpec initialized. Explicit signals: "set up openspec", "initialize specs", "start speccing this project". Also auto-triggered when Phase 1 exploration finds no `openspec/` directory (see Phase 1). Pre-flight checks via `explore` delegation:
+  1. **CLI installed**: Is `openspec` command available? If not: "OpenSpec CLI isn't installed. You need it to proceed — run `bun add -g openspec`." Stop.
+  2. **Git repo**: Does `.git/` exist? If not: "This project isn't a git repo yet. OpenSpec works without git, but anything worth speccing is probably worth versioning. Consider running `git init` first." Continue (non-blocking).
+  3. **Git remote**: Is a remote configured? If not: "No git remote configured. Specs work locally but you'll want a remote for backup and collaboration." Continue (non-blocking).
+  4. **Not already initialized**: Does `openspec/` already exist? If yes: "OpenSpec is already set up here." Resume original intent or ask what they want to do.
+  Then present the command and offer hybrid execution: "To initialize OpenSpec, run: `openspec init --tools opencode`. Want me to ask an implementation agent to run it for you?" If user accepts, delegate to a task agent. After init succeeds, confirm the structure was created and resume the original intent if this was auto-triggered.
 - **Reconcile**: User wants to update a spec after implementation revealed deviations. Signals: "we finished X", "reconcile", "debrief", "the plan changed", "update the spec with what actually happened". Auto-trigger `/opsx:propose`. Read the original spec AND the Sisyphus notepads (`.sisyphus/notepads/*/learnings.md`, `decisions.md`, `issues.md`, `problems.md`) as primary sources. Identify deviations between what was planned and what was built. Proceed through normal Phases 2-5 to update the spec — the notepads are the "user input" that drives the brainstorm. In Phase 5, the graphiti ingestion step captures the key deviations as reusable knowledge.
 - **Open-ended**: User wants guidance or suggestions ("What should I work on next?"). Auto-trigger `/opsx:explore`. Read specs, notepads, codebase. Suggest areas based on gaps, tech debt, or incomplete specs.
 - **Ambiguous**: Can't determine intent. Ask ONE clarifying question. No skills triggered yet.
 
 Verbalize like: "This sounds like you're exploring [topic] — let me dig into the current state." Not: "Classification: EXPLORATORY."
 
-Plan-to-spec and Reconcile intents are evaluated BEFORE other intents because they have concrete signals (file paths, conversion verbs, post-implementation references to notepads). Every non-trivial intent starts with exploration, and exploration can always escalate to proposal when the user is ready.
+Plan-to-spec, Init, and Reconcile intents are evaluated BEFORE other intents because they have concrete signals (file paths, conversion verbs, post-implementation references to notepads). Every non-trivial intent starts with exploration, and exploration can always escalate to proposal when the user is ready.
 
 ## Phase 1: Exploration
 
+**Auto-detect**: Before reading sources, check if `openspec/` exists in the project root. If it does not exist, pause exploration and redirect to the Init flow (Phase 0). The user likely doesn't realize OpenSpec isn't set up yet — surface this early rather than failing silently during artifact reads. After Init completes, resume Phase 1 from the beginning.
+
 Read sources to build understanding before brainstorming or generating. Order by priority:
 
-1. **OpenSpec state** (source of truth): `openspec/specs/`, `openspec/changes/`, `openspec/config.yaml`
+1. **OpenSpec state** (source of truth): `openspec/specs/`, `openspec/changes/`
 2. **Sisyphus knowledge**: `.sisyphus/notepads/` (learnings, decisions, issues, problems), `.sisyphus/plans/`, `.sisyphus/drafts/`
 3. **Project context**: `AGENTS.md`, `CLAUDE.md`, `project.md`
 4. **Other planning artifacts**: `.claude/plans/`, `PLAN.md`, `docs/rfcs/`, `docs/plans/`
