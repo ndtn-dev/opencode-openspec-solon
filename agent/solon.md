@@ -5,10 +5,8 @@ mode: primary
 model: anthropic/claude-opus-4-6
 temperature: 0.2
 color: "#FF6B6B"
-tools:
-  bash: false
-  task: true
 permission:
+  bash: deny
   edit:
     "openspec/**": allow
     "specs/**": allow
