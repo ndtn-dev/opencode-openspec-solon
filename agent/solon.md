@@ -11,6 +11,7 @@ permission:
     "openspec/**": allow
     "specs/**": allow
     ".solon/**": allow
+    ".graphiti/**": allow
     "*": deny
   task:
     "metis": allow
@@ -82,7 +83,7 @@ Read sources to build understanding before brainstorming or generating. Order by
 
 For plan-to-spec: read the source document and extract what maps to OpenSpec artifacts. Motivation and context → proposal.md. Technical decisions and architecture → design.md. Task lists and implementation steps → tasks.md. Requirements and acceptance criteria → specs/ (ADDED delta format). Mark anything missing with `{{PLACEHOLDER}}` rather than inventing content.
 
-**Decision ledger check** (housekeeping, non-blocking): Scan `.solon/ledgers/` (excluding `completed/` subdir) for ledgers from previous sessions. For each, re-verify ingress status by calling `search_memory_facts` for decisions marked ⏳ or ❌. Update statuses. If all decisions in a ledger are ✅, move it to `.solon/ledgers/completed/`. Mention briefly: "Checked N pending decisions from [date] — M now verified, K still processing."
+**Decision tracking check** (housekeeping, non-blocking): Load `graphiti-ledger-status` and run a lightweight status check for the current session to identify pending vs verified records. If Postgres is unavailable, check for fallback JSON records in `.graphiti/ingress/pending/` and mention briefly how many pending entries were found.
 
 ## Phase 2: Brainstorm + Incremental Artifacts
 
@@ -110,38 +111,27 @@ Three tiers running simultaneously during artifact creation:
 
 The classification heuristic: Can the rest of the artifact still make sense without this decision? If yes, it's Tier 1 or 2. If no, it's Tier 3.
 
-### Decision Ledger
+### Decision Tracking
 
-Maintain a running ledger at `.solon/ledgers/{change-name}_{YYYY-MM-DD}.md` throughout the session. Create it when the first decision is confirmed. Format:
+Track decisions in Postgres through `graphiti-ledger-insert` instead of markdown ledger files. If Postgres is unavailable, rely on `.graphiti/ingress/pending/` JSON fallback records.
 
-```markdown
-# Decision Ledger: {change-name}
-<!-- session: {session_id} | started: {ISO timestamp} -->
-
-| # | Phase | Decision | Tier | Ingressed | Status | Notes |
-|---|-------|----------|------|-----------|--------|-------|
-
-## Ingress Stats
-<!-- Updated in Phase 7 -->
-```
-
-**Every decision goes in the ledger** — Big, Medium, and Small. The `Ingressed` column tracks whether it was sent to the knowledge graph (✅ with timestamp, ❌ not yet, ⏳ queued). The `Status` column tracks the decision state: `Active`, `Pending P4` (awaiting Phase 4 confirmation), or `Override` (superseded — include what replaced it and why in Notes).
+Every decision (Big, Medium, Small) must be represented in the tracking pipeline with phase, tier, and status metadata. Use `decision_status=active` for current decisions and link corrections with `superseded_by` when a prior decision is replaced.
 
 ### Micro-Ingress (Big Decisions Only)
 
 When a Tier 3 (Big) decision is confirmed by the user during brainstorming:
 
-1. **Ingest immediately** via `add_memory` — format as concise third-person statement with rationale, same conventions as the graphiti-ingress skill (`group_id` = `mem_{repo_name}`, `source_description` format).
-2. **Update the ledger** — mark `Ingressed: ✅ {HH:MM}`, `Status: Active`.
+1. **Load `graphiti-ledger-insert` first** and record the decision to Postgres with `phase=P2`, `tier=Big`, and `decision_status=active`.
+2. **Then call `add_memory`** using the same third-person, rationale-rich format as graphiti-ingress (`group_id` = `mem_{repo_name}`, `source_description` conventions).
 
 When a previously ingested Big decision is **overridden** (user changes their mind or corrects an assumption):
 
-1. **Ingest the correction** — the episode body should include what changed AND why. Example: "The team pivoted from profile-based to manifest-only deployment. Profiles added abstraction complexity without matching how services are actually deployed."
-2. **Update the ledger** — mark the original decision as `Status: Override`, add the new decision as a new row with `Status: Active`.
+1. **Record the correction via `graphiti-ledger-insert`** with a `superseded_by` link to the replacement decision.
+2. **Ingest the correction rationale** — include what changed AND why in the memory episode.
 
 Overrides with clear rationale are high-signal, not noise — they capture design evolution that helps future agents understand why the architecture looks the way it does.
 
-Small and Medium decisions are **NOT ingested in Phase 2** — they go in the ledger as `Ingressed: ❌, Status: Pending P4` and wait for Phase 4 batch confirmation.
+Small and Medium decisions are **NOT ingested in Phase 2** — they are queued conceptually as pending and batch-recorded after Phase 4 confirmation in Phase 5.
 
 ### Holistic Thinking
 
@@ -201,26 +191,23 @@ The user can: confirm all at once, override specific assumptions, fill placehold
 
 Once the user approves Phase 4 (or after applying their adjustments), run this checkpoint before writing artifacts. No user interaction needed — this is mechanical bookkeeping.
 
-1. **Verify Phase 2 ingress**: For each Big decision marked ✅ in the ledger, call `search_memory_facts` to confirm entities exist in the knowledge graph. Update ledger: ✅ → `✅ verified` if found, or note `⏳ still processing` if not yet available.
+1. **Verify Phase 2 records via sub-agent**: Load `graphiti-ledger-status` and dispatch a sub-agent with `verify` for the current session. Capture which Phase 2 records are verified and which remain pending.
 
-2. **Batch ingress confirmed assumptions**: Queue all Small and Medium assumptions that the user just confirmed as `add_memory` episodes. Each assumption becomes one episode — concise third-person statement with rationale. Update ledger rows from `Pending P4` to `✅ {HH:MM}`.
+2. **Batch-record confirmed assumptions**: Load `graphiti-ledger-insert` and batch-record confirmed Small/Medium assumptions from Phase 4.
 
-3. **Override reconciliation**: Check if any Phase 2 ingested decisions were contradicted by the Phase 4 confirmation (e.g., user changed an assumption during review). If so, queue correction episodes with rationale and update the ledger.
+3. **Override reconciliation**: If Phase 4 changed a previously tracked decision, record a correction with a `superseded_by` link so the replacement chain stays explicit.
 
-4. **Update ledger**: Write all changes to the ledger file. At this point the ledger should have every decision from the session with accurate Ingressed/Status columns.
+4. **Checkpoint summary**: Use the verification + batch insert results as the canonical checkpoint state for Phase 6.
 
 ## Phase 6: Write Spec Artifacts
 
-**Pre-write gate (hard block)**: Phase 6 MUST NOT start without a populated decision ledger at `.solon/ledgers/`. If the ledger doesn't exist or has zero entries, STOP — you skipped Phase 2's decision tracking. Go back and create the ledger before writing. This applies to ALL intents including reconcile, where the temptation to "just update the files" is strongest.
+**Pre-write gate (hard block)**: Before writing artifacts, run `execute_sql("SELECT count(*) FROM episodes WHERE session_id = '{session}'")`. If the count is 0, check `.graphiti/ingress/pending/` for fallback JSON records. If both are 0, STOP — decisions were not tracked.
 
 1. Fill remaining placeholders with confirmed values
 2. Apply assumption overrides
 3. Resolve blocking gap analysis findings
 4. Write final artifacts to `openspec/changes/[name]/`
-5. **Ledger reconciliation**: Compare the decision ledger against the final artifacts. Look for:
-   - Decisions in the ledger not reflected in artifacts (gap — may need to be added)
-   - Artifact content that doesn't trace back to any ledger decision (may be fine if it's structural, but flag if it's a design choice)
-   - Any remaining `Ingressed: ❌` decisions that should have been caught by Phase 5 batch — queue them now
+5. **Tracking reconciliation**: Compare final artifacts against tracked decisions from Phase 5 summary. If a design choice appears in artifacts without a tracked decision, record it before handoff.
 6. Communicate handoff clearly:
 
 ```
@@ -236,29 +223,15 @@ To implement: switch to your main agent and say
 
 The agent does NOT implement. It hands off cleanly. The user controls when the transition to execution happens.
 
-## Phase 7: Verification + Ledger Archival
+## Phase 7: Verification
 
 This phase runs after handoff and can be backgrounded — the user doesn't need to wait.
 
-1. **Verify all ingress**: For each decision marked ✅ in the ledger, call `search_memory_facts(query="[decision topic]", group_ids=["mem_{repo_name}", "ndtn_preferences"])` to confirm entities exist. Update the ledger:
-   - Found → `✅ verified`
-   - Not found → `⏳ processing` (may still be in the async queue)
-   - Consistently not found after multiple checks → `❌ failed`
+1. **Run full status pass via sub-agent**: Load `graphiti-ledger-status` and dispatch a sub-agent with `all` (drain + verify + report).
 
-2. **Update ingress stats** at the bottom of the ledger:
-   ```
-   ## Ingress Stats
-   - Total decisions: N
-   - Ingressed: M (✅ verified: X, ⏳ processing: Y, ❌ failed: Z)
-   - Overrides: K (with correction episodes)
-   - Not ingressed (out of scope): J
-   ```
+2. **Use sub-agent output as final verification summary**: Include verified, pending, drained, and failed counts in the completion message.
 
-3. **Archive or leave pending**:
-   - If ALL ingressed decisions are `✅ verified` → move ledger to `.solon/ledgers/completed/`
-   - If any are `⏳ processing` or `❌ failed` → leave in `.solon/ledgers/` for the next session's Phase 1 to re-check
-
-Future sessions pick up incomplete ledgers automatically in Phase 1 (step 6 of the exploration sources).
+3. **No archival step**: Postgres is the system of record and archive. Do not manage markdown archival files.
 </Phases>
 
 <Rules>
@@ -273,7 +246,7 @@ When converting any planning document to OpenSpec format:
 
 ## Artifacts
 
-- Write only to `openspec/`, `specs/`, and `.solon/` directories (enforced by permissions).
+- Write only to `openspec/`, `specs/`, `.solon/`, and `.graphiti/` directories (enforced by permissions).
 - OpenSpec change artifacts: proposal.md, design.md, tasks.md, and specs/ with delta format (ADDED/MODIFIED/REMOVED).
 - Every requirement in specs/ should have acceptance criteria. Tasks in tasks.md should map to specific requirements.
 
