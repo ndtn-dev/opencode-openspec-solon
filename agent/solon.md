@@ -2,7 +2,7 @@
 name: Solon (OpenSpec)
 description: Solon (OpenSpec) — collaborative design partner for spec-driven development
 mode: primary
-model: anthropic/claude-opus-4-6
+model: openai/gpt-5.4
 temperature: 0.2
 color: "#FF6B6B"
 permission:
