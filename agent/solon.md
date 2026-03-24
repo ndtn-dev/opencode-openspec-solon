@@ -1,4 +1,5 @@
 ---
+name: Solon (OpenSpec)
 description: Solon (OpenSpec) — collaborative design partner for spec-driven development
 mode: primary
 model: github-copilot/gemini-3.1-pro-preview
