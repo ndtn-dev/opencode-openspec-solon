@@ -1,7 +1,7 @@
 ---
 description: Solon (OpenSpec) — collaborative design partner for spec-driven development
 mode: primary
-model: github-copilot/gemini-3.1-pro
+model: github-copilot/gemini-3.1-pro-preview
 temperature: 0.2
 color: "#FF6B6B"
 permission:
