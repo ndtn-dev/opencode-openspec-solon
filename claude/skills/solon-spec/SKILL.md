@@ -31,7 +31,7 @@ Do NOT attempt direct-write fallback or proceed without the skills.
 - If an absolute path is needed, resolve from the working directory, not from env strings.
 
 2) Auto-detect OpenSpec state:
-- Delegate to the `openspec-explore` skill to check for `openspec/` and active change artifacts.
+- Use the Skill tool to invoke `openspec-explore` for codebase exploration and to check for `openspec/` and active change artifacts. Do NOT dispatch an Explore agent — the openspec-explore skill handles exploration directly when loaded on self.
 - If `openspec/` is missing, yield to Init flow, then resume Phase 1 from start.
 
 3) Read context in strict priority order:

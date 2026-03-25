@@ -11,6 +11,7 @@ version_gte() {
   printf '%s\n%s' "$2" "$1" | sort -V -C
 }
 
+CHOICE=0
 prompt_choice() {
   local prompt="$1"
   shift
@@ -26,7 +27,8 @@ prompt_choice() {
   while true; do
     read -rp "> " choice
     if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
-      return $((choice - 1))
+      CHOICE=$((choice - 1))
+      return 0
     fi
     echo "  Please enter a number between 1 and ${#options[@]}"
   done
@@ -130,30 +132,57 @@ install_openspec() {
   echo "  ✓ OpenSpec CLI installed ($(openspec --version 2>/dev/null || echo 'unknown version'))"
 }
 
+make_link() {
+  local src="$1"
+  local dest="$2"
+  # Compute relative path from dest's parent to src
+  local rel
+  rel="$(python3 -c "import os.path; print(os.path.relpath('$src', os.path.dirname('$dest')))")"
+  rm -rf "$dest"
+  ln -s "$rel" "$dest"
+}
+
 install_solon() {
   local platform="$1"
   local global="$2"
   local target
+  local src_dir
 
   case "$platform" in
     claude)
+      src_dir="$SCRIPT_DIR/claude"
       if $global; then
         target="$HOME/.claude"
       else
         target=".claude"
       fi
       mkdir -p "$target/agents" "$target/skills"
-      cp "$SCRIPT_DIR/claude/agent/solon.md" "$target/agents/solon.md"
-      for skill_dir in "$SCRIPT_DIR"/claude/skills/*/; do
-        local skill_name
-        skill_name=$(basename "$skill_dir")
-        mkdir -p "$target/skills/$skill_name"
-        cp "$skill_dir"SKILL.md "$target/skills/$skill_name/SKILL.md"
-      done
+      if $global; then
+        # Global: symlink so repo changes are picked up immediately
+        make_link "$src_dir/agent/solon.md" "$target/agents/solon.md"
+        for skill_dir in "$src_dir"/skills/*/; do
+          local skill_name
+          skill_name=$(basename "$skill_dir")
+          make_link "$skill_dir" "$target/skills/$skill_name"
+        done
+      else
+        # Project-local: copy (repo may not be available from other projects)
+        cp "$src_dir/agent/solon.md" "$target/agents/solon.md"
+        for skill_dir in "$src_dir"/skills/*/; do
+          local skill_name
+          skill_name=$(basename "$skill_dir")
+          mkdir -p "$target/skills/$skill_name"
+          cp "$skill_dir"SKILL.md "$target/skills/$skill_name/SKILL.md"
+        done
+      fi
       echo ""
-      echo "Installed Solon for Claude Code ($target/):"
+      if $global; then
+        echo "Installed Solon for Claude Code ($target/) via symlinks:"
+      else
+        echo "Installed Solon for Claude Code ($target/):"
+      fi
       echo "  $target/agents/solon.md"
-      for skill_dir in "$SCRIPT_DIR"/claude/skills/*/; do
+      for skill_dir in "$src_dir"/skills/*/; do
         echo "  $target/skills/$(basename "$skill_dir")/SKILL.md"
       done
       if $global; then
@@ -163,23 +192,37 @@ install_solon() {
       fi
       ;;
     opencode)
+      src_dir="$SCRIPT_DIR/opencode"
       if $global; then
         target="$HOME/.config/opencode"
       else
         target=".opencode"
       fi
       mkdir -p "$target/agents" "$target/skills"
-      cp "$SCRIPT_DIR/opencode/agent/solon.md" "$target/agents/solon.md"
-      for skill_dir in "$SCRIPT_DIR"/opencode/skills/*/; do
-        local skill_name
-        skill_name=$(basename "$skill_dir")
-        mkdir -p "$target/skills/$skill_name"
-        cp "$skill_dir"SKILL.md "$target/skills/$skill_name/SKILL.md"
-      done
+      if $global; then
+        make_link "$src_dir/agent/solon.md" "$target/agents/solon.md"
+        for skill_dir in "$src_dir"/skills/*/; do
+          local skill_name
+          skill_name=$(basename "$skill_dir")
+          make_link "$skill_dir" "$target/skills/$skill_name"
+        done
+      else
+        cp "$src_dir/agent/solon.md" "$target/agents/solon.md"
+        for skill_dir in "$src_dir"/skills/*/; do
+          local skill_name
+          skill_name=$(basename "$skill_dir")
+          mkdir -p "$target/skills/$skill_name"
+          cp "$skill_dir"SKILL.md "$target/skills/$skill_name/SKILL.md"
+        done
+      fi
       echo ""
-      echo "Installed Solon for OpenCode ($target/):"
+      if $global; then
+        echo "Installed Solon for OpenCode ($target/) via symlinks:"
+      else
+        echo "Installed Solon for OpenCode ($target/):"
+      fi
       echo "  $target/agents/solon.md"
-      echo "  $target/skills/ ($(ls -d "$SCRIPT_DIR"/opencode/skills/*/ | wc -l) skills)"
+      echo "  $target/skills/ ($(ls -d "$src_dir"/skills/*/ | wc -l) skills)"
       ;;
   esac
 }
@@ -229,14 +272,14 @@ echo "================================"
 
 # 1) Choose platform
 prompt_choice "Which platform are you using?" "Claude Code" "OpenCode"
-case $? in
+case $CHOICE in
   0) PLATFORM="claude" ;;
   1) PLATFORM="opencode" ;;
 esac
 
 # 2) Choose scope
 prompt_choice "Where should Solon be installed?" "Project-local (current directory)" "Global (available in all projects)"
-case $? in
+case $CHOICE in
   0) GLOBAL=false ;;
   1) GLOBAL=true ;;
 esac
@@ -245,22 +288,28 @@ esac
 install_solon "$PLATFORM" "$GLOBAL"
 
 # 4) OpenSpec
-prompt_choice "Install OpenSpec CLI?" "Yes" "No"
-case $? in
-  0)
-    install_openspec
-    if ! $GLOBAL; then
+if command -v openspec &>/dev/null; then
+  echo ""
+  echo "OpenSpec CLI already installed ($(openspec --version 2>/dev/null || echo 'unknown version'))."
+else
+  prompt_choice "Install OpenSpec CLI?" "Yes" "No"
+  case $CHOICE in
+    0)
+      install_openspec
+      ;;
+    1)
       echo ""
-      echo "Initializing OpenSpec in current project..."
-      openspec init
-      echo "  ✓ OpenSpec initialized"
-    fi
-    ;;
-  1)
-    echo ""
-    echo "Skipping OpenSpec installation."
-    ;;
-esac
+      echo "Skipping OpenSpec installation."
+      ;;
+  esac
+fi
+
+if ! $GLOBAL && command -v openspec &>/dev/null && [[ ! -d openspec ]]; then
+  echo ""
+  echo "Initializing OpenSpec in current project..."
+  openspec init
+  echo "  ✓ OpenSpec initialized"
+fi
 
 echo ""
 echo "Done! You're ready to go."

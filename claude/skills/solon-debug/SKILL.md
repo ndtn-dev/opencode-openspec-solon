@@ -56,11 +56,16 @@ openspec --version
 Compare the output against `.solon/openspec-version.txt` (read with Read tool).
 
 - **Current**: Versions match. Report "OpenSpec version is current."
-- **Stale**: Versions differ or marker file does not exist. Report "OpenSpec version may be stale." and proceed to remediation.
+- **Marker missing** (first run): Report "No version marker found. Writing current version as baseline." Write the marker directly:
+  ```bash
+  openspec --version > .solon/openspec-version.txt
+  ```
+  This is NOT an error — it's expected on first run. Do not suggest `openspec update --force`.
+- **Stale**: Versions differ (marker exists but doesn't match). Report "OpenSpec version is stale." and proceed to remediation.
 
 ## Remediation
 
-Run remediation when Check 3 fails (missing skills) or Check 5 detects staleness.
+Run remediation when Check 3 fails (missing skills) or Check 5 detects staleness (versions differ, not just marker missing).
 
 ```bash
 openspec update --force
