@@ -11,7 +11,7 @@ Loaded after Solon completes Phase 6. Generates an implementation handoff docume
 
 ## Step 1 — Generate Handoff Document
 
-Write `.sisyphus/handover/[name].md` with:
+Write to `.sisyphus/handover/[name].md` if it exists, otherwise `docs/handover/[name].md`. Contents:
 
 - **Spec reference**: `openspec/changes/[name]/` — proposal.md, design.md, tasks.md, specs/
 - **Key decisions summary**: Implementation-relevant decisions from design.md
@@ -25,7 +25,7 @@ After writing the handoff document, offer to dispatch an implementation planning
 "Handoff document written. Want me to dispatch a planner agent to create an implementation plan from this spec?"
 
 If the user accepts, dispatch an Agent with prompt:
-"Create an implementation plan from the spec at openspec/changes/[name]/. Key constraints: [constraints from handoff doc]. Write the plan to .sisyphus/plans/."
+"Create an implementation plan from the spec at openspec/changes/[name]/. Key constraints: [constraints from handoff doc]. Write the plan to .sisyphus/plans/ if it exists, otherwise docs/plans/."
 
 Populate `[name]`, constraints, and file paths from the actual spec before dispatching.
 
@@ -40,5 +40,5 @@ say: "Create a plan from the spec at openspec/changes/[name]/"
 
 ## Return
 
-1. Handoff document path: `.sisyphus/handover/[name].md`
-2. Either: Plan path (`.sisyphus/plans/[name].md`) on success, or manual instructions on failure
+1. Handoff document path (whichever location was used)
+2. Either: Plan path on success, or manual instructions on failure

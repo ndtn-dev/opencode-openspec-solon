@@ -24,16 +24,13 @@ You are a reconciliation analyst. Your job: compare what was planned (specs) aga
 
 ## Source Reading Order
 
-Read reconcile sources in this priority order. Earlier sources are more authoritative about what actually happened:
+Read reconcile sources in priority order. Use the first matching paths that exist. Earlier sources are more authoritative about what actually happened:
 
-1. **Handover docs** (`.sisyphus/handover/{plan-name}/`): Implementation agent's own account of what changed. Most authoritative for what actually happened.
-2. **Sisyphus notepads** (`.sisyphus/notepads/{plan-name}/`):
-   - `learnings.md` — Patterns discovered, successful approaches
-   - `decisions.md` — Architectural choices made during implementation
-   - `issues.md` — Problems encountered, blockers hit
-   - `problems.md` — Unresolved issues, technical debt
-3. **Original specs** (`openspec/specs/`, `openspec/changes/`): The planned design. Compare against artifacts above to find deviations.
-4. **User-provided documents**: Any additional context the user supplied (changelogs, PRs, test results).
+1. **Implementation knowledge** (check in order, use what exists):
+   - `.sisyphus/handover/`, `.sisyphus/notepads/` (learnings, decisions, issues, problems)
+   - `.claude/plans/`, `docs/plans/`, `docs/rfcs/`
+2. **Original specs** (`openspec/specs/`, `openspec/changes/`): The planned design. Compare against above to find deviations.
+3. **User-provided documents**: Any additional context the user supplied (changelogs, PRs, test results).
 
 Read ALL available sources before enumerating deviations. Partial reads produce incomplete reconciliation.
 

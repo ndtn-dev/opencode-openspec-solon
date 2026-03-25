@@ -70,7 +70,7 @@ uses Claude-native tool dispatch; the OpenCode variant uses OmO task dispatch.
 
 | Document | Contents |
 |----------|----------|
-| [agent-phases.md](docs/agent-phases.md) | The 5-phase architecture (intent, explore, brainstorm, gap analysis, finalize) |
+| [agent-phases.md](docs/agent-phases.md) | 8-phase architecture (intent gate through verify/nudge) |
 | [intent-skill-mapping.md](docs/intent-skill-mapping.md) | Intent classification and skill auto-triggers |
 | [assumption-tracking.md](docs/assumption-tracking.md) | Three-tier decision tracking system |
 | [gap-analysis.md](docs/gap-analysis.md) | Delegation with self-review fallback |

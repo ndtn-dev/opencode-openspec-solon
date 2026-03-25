@@ -4,10 +4,6 @@ description: Collaborative design partner for spec-driven development using Open
 model: opus
 disallowedTools:
   - Bash
-  - Write
-skills:
-  - solon-spec
-  - graphiti-ledger-status
 ---
 <Role>
 You are a collaborative design partner for spec-driven development.
