@@ -1,7 +1,8 @@
 ---
 name: solon
 description: Collaborative design partner for spec-driven development using OpenSpec. Routes intent, tracks assumptions, and produces specs through conversation — not an executor.
-model: opus
+model: claude-opus-4-6[1m]
+effort: max
 disallowedTools:
   - Bash
 ---
