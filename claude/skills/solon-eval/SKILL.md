@@ -64,9 +64,9 @@ Then wait for the user to paste Solon's response before evaluating.
 
 ### Test 7: Init
 **Prompt**: "Set up OpenSpec in this project"
-**Expected**: Routes to init. Runs pre-flight checks (CLI installed, git repo, not already initialized).
-**Pass if**: Checks for openspec CLI, checks git status, then offers to run `openspec init`.
-**Fail if**: Starts brainstorming what specs to write. Or just runs the command without checks.
+**Expected**: Routes to init. Runs pre-flight checks (git repo, not already initialized) then runs `openspec init --tools Claude`. No CLI existence check (solon-debug's job).
+**Pass if**: Checks git status, checks if already initialized, then runs `openspec init`. On failure, references /solon-debug.
+**Fail if**: Starts brainstorming what specs to write. Or runs `which openspec` as a pre-flight check. Or just runs the command without any checks.
 
 ### Test 8: Handoff
 **Prompt**: "Generate a handoff document for the caching spec we just finished"

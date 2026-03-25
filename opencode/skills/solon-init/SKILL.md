@@ -19,19 +19,7 @@ Loaded by a sub-agent. Initializes OpenSpec in a project with pre-flight environ
 
 ## Pre-flight Checks
 
-### 1. CLI Installed
-
-Check if `openspec` command is available.
-
-```bash
-which openspec
-```
-
-**If not found:**
-Report: "OpenSpec CLI isn't installed. You need it to proceed — run `bun add -g openspec`."
-**STOP** — do not proceed.
-
-### 2. Git Repo
+### 1. Git Repo
 
 Check if `.git/` directory exists.
 
@@ -43,7 +31,7 @@ test -d .git
 Warn: "This project isn't a git repo yet. OpenSpec works without git, but anything worth speccing is probably worth versioning. Consider running `git init` first."
 **Continue** (non-blocking).
 
-### 3. Git Remote
+### 2. Git Remote
 
 Check if a remote is configured.
 
@@ -55,7 +43,7 @@ git remote -v | grep -q .
 Warn: "No git remote configured. Specs work locally but you'll want a remote for backup and collaboration."
 **Continue** (non-blocking).
 
-### 4. Not Already Initialized
+### 3. Not Already Initialized
 
 Check if `openspec/` directory exists.
 
@@ -76,6 +64,10 @@ openspec init --tools Claude
 ```
 
 Confirm the `openspec/` directory structure was created.
+
+**If `openspec init` fails:**
+Report: "OpenSpec initialization failed. Run /solon-debug to diagnose."
+**STOP** — do not proceed.
 
 ## Return
 

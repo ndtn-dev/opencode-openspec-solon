@@ -54,6 +54,16 @@ switch to your main agent and say:
   "Create a plan from the spec at openspec/changes/[name]/"
 ```
 
+## Post-Implementation Workflow
+
+The handoff document MUST include a section referencing these post-implementation steps (in order). These are for the implementer's awareness only -- solon-handoff does NOT invoke them.
+
+1. **Apply**: `openspec-apply-change` -- Implements the delta specs from the change directory to the baseline specs.
+2. **Verify**: `openspec-verify-change` -- Validates that implementation matches spec requirements.
+3. **Archive**: `openspec-archive-change` -- Archives the completed change and merges delta specs into baseline.
+
+Use the exact skill names above in the handoff document.
+
 ## Return
 
 1. Handoff document path: `.sisyphus/handover/[name].md`

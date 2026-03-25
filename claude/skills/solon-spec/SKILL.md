@@ -15,27 +15,37 @@ Hard boundaries:
 
 ## Phase 1: Exploration
 Run exploration before brainstorming or writing.
-0) Path resolution:
+
+0) Skill presence gate (BLOCKING):
+Before any exploration, verify these three skill files exist:
+- `.claude/skills/openspec-explore/SKILL.md`
+- `.claude/skills/openspec-new-change/SKILL.md`
+- `.claude/skills/openspec-continue-change/SKILL.md`
+
+If any are missing: **STOP**. Report: "OpenSpec dependency missing. Run /solon-debug to diagnose."
+Do NOT attempt direct-write fallback or proceed without the skills.
+
+1) Path resolution:
 - Use relative paths for all file operations: `openspec/`, `.sisyphus/`, `.solon/`, `.graphiti/`.
 - Do not construct absolute paths from injected environment metadata (it may be incorrect).
 - If an absolute path is needed, resolve from the working directory, not from env strings.
 
-1) Auto-detect OpenSpec state:
-- Use the Explore agent or Glob/Read tools to check for `openspec/` and active change artifacts.
+2) Auto-detect OpenSpec state:
+- Delegate to the `openspec-explore` skill to check for `openspec/` and active change artifacts.
 - If `openspec/` is missing, yield to Init flow, then resume Phase 1 from start.
 
-2) Read context in strict priority order:
+3) Read context in strict priority order:
 1. OpenSpec state: `openspec/specs/`, `openspec/changes/`
 2. Sisyphus knowledge: `.sisyphus/notepads/`, `.sisyphus/plans/`, `.sisyphus/handover/`
 3. Project context: `AGENTS.md`, `CLAUDE.md`, `project.md`
 4. Other planning artifacts: `.claude/plans/`, `PLAN.md`, `docs/rfcs/`, `docs/plans/`
 5. Relevant codebase files only
 
-3) Run decision tracking housekeeping:
+4) Run decision tracking housekeeping:
 - Invoke the `graphiti-ledger-status` skill and perform a lightweight session check.
 - If Postgres is unavailable, count `.graphiti/ingress/pending/` JSON fallbacks.
 
-4) Plan-to-spec conversion rules:
+5) Plan-to-spec conversion rules:
 - Motivation/context -> `proposal.md`
 - Architecture/constraints -> `design.md`
 - Implementation sequencing -> `tasks.md`
@@ -178,14 +188,20 @@ Pre-write gate (hard stop):
 3. If zero, check `.graphiti/ingress/pending/` fallback JSON count.
 4. If both are zero, stop and report checkpoint failure.
 
-Write sequence:
-1. Fill placeholders only with confirmed values.
-2. Apply approved overrides.
-3. Resolve blocking Phase 3 gaps.
-4. Write to `openspec/changes/[name]/`.
-5. Ensure artifacts match tracked decision history.
+Write sequence — sub-agent delegation:
+Dispatch a sub-agent via the Agent tool with Bash access. The sub-agent:
+1. Invokes the `openspec-new-change` skill (via Skill tool) to scaffold the change directory.
+2. Invokes the `openspec-continue-change` skill (via Skill tool) for each artifact.
+
+Sub-agent prompt must include:
+- All confirmed decisions, scope boundaries, constraints, and filled placeholders from Phases 2-4.
+- Content fence instruction: for any template section with no confirmed content, write `{{DEFERRED: not addressed in current spec cycle}}`. Do not generate new content.
+
+If the sub-agent's skill invocation fails: **STOP**. Report: "OpenSpec skill invocation failed. Run /solon-debug to diagnose."
+Do NOT fall back to writing artifact files directly.
 
 Locked-state rule:
+- No new content generation during artifact writing (content fence enforced).
 - No return to brainstorm while current write pass is active.
 - If interrupted, finish current write unit, then loop back to Phase 2.
 
