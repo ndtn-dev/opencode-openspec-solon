@@ -1,0 +1,14 @@
+{
+  "spec": "openspec-skill-integration",
+  "phase": 5,
+  "completed_at": "2026-03-25T00:00:00Z",
+  "session_id": "manual",
+  "decisions_confirmed": 10,
+  "assumptions_small": 4,
+  "assumptions_medium": 0,
+  "gaps_blocking": 0,
+  "gaps_warning": 0,
+  "gaps_note": 1,
+  "graphiti_available": false,
+  "ingestion_skipped_reason": "no graphiti connection this session"
+}
