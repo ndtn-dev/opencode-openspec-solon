@@ -42,7 +42,7 @@ Check 4 — Profile Detection:
 Check 5 — Version Staleness:
   Run: openspec --version
   Read .solon/openspec-version.txt (may not exist).
-  Current (versions match): report 'OpenSpec version is current (v[version]). To check for upstream updates: openspec update'
+  Current (versions match): report 'OpenSpec version is current (v[version]).'
   Marker missing (first run): report 'No version marker found. Writing current version as baseline.' Then run: openspec --version > .solon/openspec-version.txt — this is NOT an error, do not suggest openspec update --force.
   Stale (versions differ): report 'OpenSpec version is stale.' and run remediation.
 
@@ -55,6 +55,8 @@ Remediation (only when Check 3 fails or Check 5 detects version mismatch):
     3. openspec config profile (check/switch profile)
 
 After all checks, output a summary table with each check's pass/fail status. For each failure, include the actionable fix command. If all pass: 'OpenSpec environment is healthy. No issues found.'
+
+After the table, on its own line: 'To check for upstream updates: openspec update'
 
 The sub-agent may use Bash, Read, and Glob tools only. Version marker writes go through Bash, not the Write tool. Only write to .solon/."
 ```
