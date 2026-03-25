@@ -1,39 +1,43 @@
 #!/bin/bash
 set -euo pipefail
 
-PLATFORM=${1:-}
-SCOPE=${2:-local}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OPENSPEC_MIN_NODE="20.19.0"
 
-usage() {
-  echo "Usage: ./install.sh <claude|opencode> [--global]"
-  echo ""
-  echo "Copies Solon agent and skills to the appropriate config directory."
-  echo ""
-  echo "  claude    -> .claude/agents/ and .claude/skills/"
-  echo "  opencode  -> .opencode/agents/ and .opencode/skills/"
-  echo ""
-  echo "  --global  Install to ~/.claude/ or ~/.config/opencode/ (available in all projects)"
-  echo "            Also adds a 'solon' shell alias for claude --agent solon"
-  echo "  (default) Install to current directory (project-local)"
-  exit 1
+# ── Helpers ──────────────────────────────────────────────────────────
+
+version_gte() {
+  # returns 0 (true) if $1 >= $2
+  printf '%s\n%s' "$2" "$1" | sort -V -C
 }
 
-if [[ -z "$PLATFORM" ]]; then
-  usage
-fi
+prompt_choice() {
+  local prompt="$1"
+  shift
+  local options=("$@")
 
-if [[ "$SCOPE" == "--global" ]]; then
-  GLOBAL=true
-else
-  GLOBAL=false
-fi
+  echo ""
+  echo "$prompt"
+  for i in "${!options[@]}"; do
+    echo "  $((i + 1))) ${options[$i]}"
+  done
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local choice
+  while true; do
+    read -rp "> " choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#options[@]} )); then
+      return $((choice - 1))
+    fi
+    echo "  Please enter a number between 1 and ${#options[@]}"
+  done
+}
+
+# ── Install functions ────────────────────────────────────────────────
 
 install_alias() {
   local alias_line="alias solon='claude --agent solon'"
   local fish_line="alias solon 'claude --agent solon'"
-  local added=false
+  local added_shells=()
 
   # zsh
   if [[ -f "$HOME/.zshrc" ]]; then
@@ -42,7 +46,7 @@ install_alias() {
       echo "# Solon — OpenSpec design partner" >> "$HOME/.zshrc"
       echo "$alias_line" >> "$HOME/.zshrc"
       echo "  Added alias to ~/.zshrc"
-      added=true
+      added_shells+=("zsh")
     else
       echo "  Alias already in ~/.zshrc"
     fi
@@ -55,7 +59,7 @@ install_alias() {
       echo "# Solon — OpenSpec design partner" >> "$HOME/.bashrc"
       echo "$alias_line" >> "$HOME/.bashrc"
       echo "  Added alias to ~/.bashrc"
-      added=true
+      added_shells+=("bash")
     else
       echo "  Alias already in ~/.bashrc"
     fi
@@ -69,61 +73,194 @@ install_alias() {
       echo "# Solon — OpenSpec design partner" >> "$fish_conf"
       echo "$fish_line" >> "$fish_conf"
       echo "  Added alias to $fish_conf"
-      added=true
+      added_shells+=("fish")
     else
       echo "  Alias already in $fish_conf"
     fi
   fi
 
-  if $added; then
-    echo "  Restart your shell or run: source ~/.zshrc (or equivalent)"
+  if [[ ${#added_shells[@]} -gt 0 ]]; then
+    echo ""
+    echo "  Restart your terminal or reload your shell config to activate the alias:"
+    for shell in "${added_shells[@]}"; do
+      case "$shell" in
+        zsh)  echo "    zsh:  source ~/.zshrc" ;;
+        bash) echo "    bash: source ~/.bashrc" ;;
+        fish) echo "    fish: source ~/.config/fish/config.fish" ;;
+      esac
+    done
   fi
 }
 
-case "$PLATFORM" in
-  claude)
-    if $GLOBAL; then
-      TARGET="$HOME/.claude"
-    else
-      TARGET=".claude"
-    fi
-    mkdir -p "$TARGET/agents" "$TARGET/skills"
-    cp "$SCRIPT_DIR/claude/agent/solon.md" "$TARGET/agents/solon.md"
-    for skill_dir in "$SCRIPT_DIR"/claude/skills/*/; do
-      skill_name=$(basename "$skill_dir")
-      mkdir -p "$TARGET/skills/$skill_name"
-      cp "$skill_dir"SKILL.md "$TARGET/skills/$skill_name/SKILL.md"
-    done
-    echo "Installed Solon for Claude Code ($TARGET/):"
-    echo "  $TARGET/agents/solon.md"
-    for skill_dir in "$SCRIPT_DIR"/claude/skills/*/; do
-      echo "  $TARGET/skills/$(basename "$skill_dir")/SKILL.md"
-    done
-    if $GLOBAL; then
+install_openspec() {
+  echo ""
+  echo "Installing OpenSpec CLI..."
+
+  if ! command -v node &>/dev/null; then
+    echo "  ⚠ Node.js not found. OpenSpec requires Node.js >= $OPENSPEC_MIN_NODE."
+    echo "  Skipping OpenSpec installation. Install Node.js and run:"
+    echo "    npm install -g @fission-ai/openspec@latest"
+    return
+  fi
+
+  local node_version
+  node_version="$(node -v | sed 's/^v//')"
+  if ! version_gte "$node_version" "$OPENSPEC_MIN_NODE"; then
+    echo "  ⚠ Node.js $node_version found, but OpenSpec requires >= $OPENSPEC_MIN_NODE."
+    echo "  Skipping OpenSpec installation. Upgrade Node.js and run:"
+    echo "    npm install -g @fission-ai/openspec@latest"
+    return
+  fi
+
+  local pkg_mgr=""
+  if command -v bun &>/dev/null; then
+    pkg_mgr="bun"
+  elif command -v npm &>/dev/null; then
+    pkg_mgr="npm"
+  else
+    echo "  ⚠ Neither bun nor npm found. Install one and run:"
+    echo "    npm install -g @fission-ai/openspec@latest"
+    echo "    # or"
+    echo "    bun install -g @fission-ai/openspec@latest"
+    return
+  fi
+
+  echo "  Using $pkg_mgr..."
+  $pkg_mgr install -g @fission-ai/openspec@latest
+  echo "  ✓ OpenSpec CLI installed ($(openspec --version 2>/dev/null || echo 'unknown version'))"
+}
+
+install_solon() {
+  local platform="$1"
+  local global="$2"
+  local target
+
+  case "$platform" in
+    claude)
+      if $global; then
+        target="$HOME/.claude"
+      else
+        target=".claude"
+      fi
+      mkdir -p "$target/agents" "$target/skills"
+      cp "$SCRIPT_DIR/claude/agent/solon.md" "$target/agents/solon.md"
+      for skill_dir in "$SCRIPT_DIR"/claude/skills/*/; do
+        local skill_name
+        skill_name=$(basename "$skill_dir")
+        mkdir -p "$target/skills/$skill_name"
+        cp "$skill_dir"SKILL.md "$target/skills/$skill_name/SKILL.md"
+      done
       echo ""
-      echo "Shell alias:"
-      install_alias
+      echo "Installed Solon for Claude Code ($target/):"
+      echo "  $target/agents/solon.md"
+      for skill_dir in "$SCRIPT_DIR"/claude/skills/*/; do
+        echo "  $target/skills/$(basename "$skill_dir")/SKILL.md"
+      done
+      if $global; then
+        echo ""
+        echo "Shell alias:"
+        install_alias
+      fi
+      ;;
+    opencode)
+      if $global; then
+        target="$HOME/.config/opencode"
+      else
+        target=".opencode"
+      fi
+      mkdir -p "$target/agents" "$target/skills"
+      cp "$SCRIPT_DIR/opencode/agent/solon.md" "$target/agents/solon.md"
+      for skill_dir in "$SCRIPT_DIR"/opencode/skills/*/; do
+        local skill_name
+        skill_name=$(basename "$skill_dir")
+        mkdir -p "$target/skills/$skill_name"
+        cp "$skill_dir"SKILL.md "$target/skills/$skill_name/SKILL.md"
+      done
+      echo ""
+      echo "Installed Solon for OpenCode ($target/):"
+      echo "  $target/agents/solon.md"
+      echo "  $target/skills/ ($(ls -d "$SCRIPT_DIR"/opencode/skills/*/ | wc -l) skills)"
+      ;;
+  esac
+}
+
+# ── Non-interactive mode (backwards-compatible) ─────────────────────
+
+if [[ $# -gt 0 ]]; then
+  PLATFORM=${1:-}
+  GLOBAL=false
+  SKIP_OPENSPEC=false
+
+  shift || true
+  for arg in "$@"; do
+    case "$arg" in
+      --global) GLOBAL=true ;;
+      --skip-openspec) SKIP_OPENSPEC=true ;;
+      *) ;;
+    esac
+  done
+
+  case "$PLATFORM" in
+    claude|opencode)
+      install_solon "$PLATFORM" "$GLOBAL"
+      if ! $SKIP_OPENSPEC; then
+        install_openspec
+        if ! $GLOBAL; then
+          echo ""
+          echo "Initializing OpenSpec in current project..."
+          openspec init
+          echo "  ✓ OpenSpec initialized"
+        fi
+      fi
+      ;;
+    *)
+      echo "Unknown platform: $PLATFORM"
+      echo "Usage: ./install.sh <claude|opencode> [--global] [--skip-openspec]"
+      exit 1
+      ;;
+  esac
+  exit 0
+fi
+
+# ── Interactive mode ─────────────────────────────────────────────────
+
+echo "Solon — OpenSpec Design Partner"
+echo "================================"
+
+# 1) Choose platform
+prompt_choice "Which platform are you using?" "Claude Code" "OpenCode"
+case $? in
+  0) PLATFORM="claude" ;;
+  1) PLATFORM="opencode" ;;
+esac
+
+# 2) Choose scope
+prompt_choice "Where should Solon be installed?" "Project-local (current directory)" "Global (available in all projects)"
+case $? in
+  0) GLOBAL=false ;;
+  1) GLOBAL=true ;;
+esac
+
+# 3) Install Solon agent + skills
+install_solon "$PLATFORM" "$GLOBAL"
+
+# 4) OpenSpec
+prompt_choice "Install OpenSpec CLI?" "Yes" "No"
+case $? in
+  0)
+    install_openspec
+    if ! $GLOBAL; then
+      echo ""
+      echo "Initializing OpenSpec in current project..."
+      openspec init
+      echo "  ✓ OpenSpec initialized"
     fi
     ;;
-  opencode)
-    if $GLOBAL; then
-      TARGET="$HOME/.config/opencode"
-    else
-      TARGET=".opencode"
-    fi
-    mkdir -p "$TARGET/agents" "$TARGET/skills"
-    cp "$SCRIPT_DIR/opencode/agent/solon.md" "$TARGET/agents/solon.md"
-    for skill_dir in "$SCRIPT_DIR"/opencode/skills/*/; do
-      skill_name=$(basename "$skill_dir")
-      mkdir -p "$TARGET/skills/$skill_name"
-      cp "$skill_dir"SKILL.md "$TARGET/skills/$skill_name/SKILL.md"
-    done
-    echo "Installed Solon for OpenCode ($TARGET/):"
-    echo "  $TARGET/agents/solon.md"
-    echo "  $TARGET/skills/ ($(ls -d "$SCRIPT_DIR"/opencode/skills/*/ | wc -l) skills)"
-    ;;
-  *)
-    echo "Unknown platform: $PLATFORM"
-    usage
+  1)
+    echo ""
+    echo "Skipping OpenSpec installation."
     ;;
 esac
+
+echo ""
+echo "Done! You're ready to go."
