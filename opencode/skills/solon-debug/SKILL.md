@@ -62,7 +62,7 @@ openspec --version
 
 Compare the output against `.solon/openspec-version.txt` (read with Read tool).
 
-- **Current**: Versions match. Report "OpenSpec version is current."
+- **Current**: Versions match. Report "OpenSpec version is current (v[version]). To check for upstream updates: `openspec update`"
 - **Marker missing** (first run): Report "No version marker found. Writing current version as baseline." Write the marker directly:
   ```bash
   openspec --version > .solon/openspec-version.txt
