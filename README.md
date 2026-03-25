@@ -82,6 +82,7 @@ uses Claude-native tool dispatch; the OpenCode variant uses OmO task dispatch.
 | [opencode-agent-reference.md](docs/opencode-agent-reference.md) | OpenCode agent creation quick reference |
 | [claude-code-port-plan.md](docs/claude-code-port-plan.md) | Port plan from OpenCode to Claude Code |
 | [open-sourcing.md](docs/open-sourcing.md) | Relationship to prior art, publish checklist |
+| [openspec-integration.md](docs/openspec-integration.md) | Proposal: wrap OpenSpec CLI skills instead of reimplementing |
 
 ## License
 
