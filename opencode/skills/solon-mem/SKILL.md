@@ -19,38 +19,62 @@ Resolve once per session, reuse for all operations:
 ## Classification
 
 Two tiers only:
-- **Key**: evolved (changed during conversation), architectural (affects system structure), or contentious (user debated alternatives).
-- **Routine**: everything else — accepted without debate.
+- **Key**: meets ANY of these — evolved (changed or superseded during conversation), architectural (affects system structure, data flow, API boundaries, event models, or component relationships), or contentious (user debated alternatives or explicitly chose between options).
+- **Routine**: accepted without debate AND does not affect system structure.
+
+When classification is ambiguous, default to **key**.
 
 Do NOT use Big/Medium/Small or any other multi-tier system.
 
 ## Staging Decisions
 
-The caller's prompt contains one or more decisions to stage. Process ALL of them — do not stop after the first.
+The caller's prompt contains one or more decisions to stage. Process ALL of them in a single invocation.
 
-For each decision in the prompt, write an entry to `.solon/staging/{spec-name}.md`:
-
+### Setup
 1. Ensure `.solon/staging/` exists (create if needed).
 2. If a staging file exists for this spec:
    - **Same session ID in header** -> append, continuing the D-NNN sequence.
    - **Different session ID** -> archive the old file to `.solon/staging/{spec-name}.{old-session-id}.md`, then create a fresh file.
 3. If no staging file exists, create one with a header.
-4. Assign sequential IDs: D-001, D-002, etc. (continuing from the last entry if appending).
-5. Write ALL decision entries in one pass (see format below).
-6. After writing, dispatch to Clio (see below).
+
+### For EACH decision in the caller's prompt
+4. Classify the decision (key or routine).
+5. Assign the next sequential ID (D-001, D-002, etc., continuing from the last entry if appending).
+6. Write the entry to the staging file using the format below.
+
+### After ALL entries are written
+7. Verify: count of entries written MUST match count of decisions received.
+8. Report: "Staged N decisions (D-001 through D-NNN)".
+9. Proceed to Clio dispatch (see below).
+
+Do NOT return or yield control until steps 7-9 are complete.
 
 ## Clio Dispatch
 
-After writing all decisions to the staging file, dispatch to Clio once with all staged decisions:
+After writing ALL decisions to the staging file, dispatch to Clio ONCE:
 
 1. Determine `group_id` from `.graphiti/config.yaml` or caller context.
 2. If `group_id` is unavailable: skip dispatch, log that group_id was unavailable.
-3. Dispatch the `clio` agent in the background with ingress intent, including all decisions from this invocation:
-   - Decision titles, classifications (key/routine), session ID, group_id
-   - Verbose context (conversation excerpts)
-   - Decision text for each
-   - Supersedes references (if applicable)
-4. One Clio dispatch per solon-mem invocation, not per decision.
+3. Dispatch the `clio` agent in the background with this structured batch payload:
+
+```
+Remember these decisions from spec session:
+
+Spec: {spec-name}
+Session: {session-id}
+Group: {group_id}
+
+Decisions:
+1. **{title}** [{classification}]
+   Context: {quoted conversation excerpts}
+   Decision: {decision text}
+   Supersedes: {D-NNN or none}
+
+2. **{title}** [{classification}]
+   ...
+```
+
+4. One Clio dispatch per solon-mem invocation. Do NOT dispatch per decision.
 
 ### Graceful Degradation
 

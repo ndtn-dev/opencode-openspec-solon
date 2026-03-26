@@ -31,7 +31,10 @@ Do NOT attempt direct-write fallback or proceed without the skills.
 
 2) Auto-detect OpenSpec state:
 - Use the Skill tool to invoke `openspec-explore` for codebase exploration and to check for `openspec/` and active change artifacts. Do NOT dispatch an Explore agent — the openspec-explore skill handles exploration directly when loaded on self.
-- If `openspec/` is missing, yield to Init flow, then resume Phase 1 from start.
+- If `openspec/` is missing:
+  1. Use the Skill tool to invoke `solon-init` with prompt "Initialize OpenSpec in this project."
+  2. If solon-init succeeds, resume Phase 1 from start (re-invoke openspec-explore).
+  3. If solon-init fails: STOP. Report: "OpenSpec initialization failed. Run /solon-debug to diagnose."
 
 3) Read context in strict priority order:
 1. OpenSpec state: `openspec/specs/`, `openspec/changes/`
@@ -65,10 +68,10 @@ Every decision is tracked. No decision goes unrecorded.
 
 Decision staging (MANDATORY — do this when decisions are confirmed):
 When the user confirms one or more decisions:
-1. Use the Skill tool to invoke `solon-mem` with a prompt listing ALL newly confirmed decisions. For each decision include: spec name, phase, decision title, context (quoted user statements), and decision text.
-2. If any decision corrects, reverses, or replaces a prior one, include the prior decision ID as a supersedes reference.
+1. Use the Skill tool to invoke `solon-mem` with a prompt listing ALL newly confirmed decisions. Structure the prompt with: spec name, phase, and a numbered list where each item has decision title, context (quoted user statements), and decision text.
+2. If any decision corrects, reverses, or replaces a prior one, include the prior decision ID as a supersedes reference on that item.
 3. Do NOT write to `.solon/staging/` directly — solon-mem owns that file.
-4. solon-mem handles classification (key/routine), writes to `.solon/staging/`, and dispatches to Clio in the background.
+4. solon-mem handles classification (key/routine), writes ALL decisions to `.solon/staging/` in one pass, and dispatches a single batch to Clio in the background.
 
 Holistic thinking requirements:
 - Surface second-order effects.

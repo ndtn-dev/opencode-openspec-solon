@@ -1,6 +1,6 @@
 ---
 name: graphiti-ledger-status
-description: Drains pending JSON fallbacks, verifies episodes in FalkorDB, and reports ledger status. Always dispatch to a background Agent to prevent context bloat.
+description: Drains pending JSON fallbacks, verifies episodes in FalkorDB, and reports ledger status. Runs inline when co-loaded by an agent, or dispatches to a background Agent when standalone.
 ---
 
 # Graphiti Ledger Status
@@ -8,14 +8,17 @@ description: Drains pending JSON fallbacks, verifies episodes in FalkorDB, and r
 ## When Loaded
 
 Load this skill when ledger health must be checked or reconciled:
-- Solon phase 5 and phase 7 checks
+- Agent-initiated checks (e.g., Clio status routing, periodic verification)
 - Manual requests like "check the ledger", "drain the queue", or "verify episodes"
-
-Main-agent role: dispatch this to a background Agent. Do not run drain/verify/report directly in the main-agent context.
 
 ## Delegation Pattern
 
-Always dispatch to a background Agent:
+Context-aware delegation:
+
+- **Co-loaded by another agent** (e.g., Clio): Run inline within the calling agent's context. The co-loading agent controls execution.
+- **Loaded standalone**: Dispatch to a background Agent to prevent context bloat.
+
+When dispatching standalone:
 "CHECK LEDGER STATUS: [drain|verify|report|all] for session {session_id}"
 
 The agent executes one operation (`drain`, `verify`, `report`) or full sequence (`all`).
@@ -150,4 +153,5 @@ Run in strict order:
 - Do not call `add_memory()` from this skill.
 - Do not mutate episode content fields.
 - Update status/timestamps only (`ingressed_at`, `verified_at`, `failed_at`, `failure_reason`).
-- Keep main-agent context thin: all heavy operations run in delegated agent.
+- When standalone: keep main-agent context thin by dispatching to a background agent.
+- When co-loaded: run inline; the calling agent manages its own context.

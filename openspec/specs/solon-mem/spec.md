@@ -7,18 +7,26 @@ Defines the solon-mem decision staging skill. solon-mem handles per-decision cla
 ## Requirements
 
 ### Requirement: Two-tier decision classification
-solon-mem SHALL classify each decision as either "key" or "routine." A decision is "key" if it is evolved (changed during conversation), architectural (affects system structure), or contentious (user debated alternatives). All other decisions are "routine." solon-mem MUST NOT use a three-tier or multi-tier classification system.
+solon-mem SHALL classify each decision as either "key" or "routine." A decision is "key" if it meets ANY of the following criteria: evolved (changed or superseded during conversation), architectural (affects system structure, data flow, API boundaries, event models, or component relationships), or contentious (user debated alternatives or explicitly chose between options). All other decisions — accepted without debate and not affecting system structure — are "routine." When classification is ambiguous, solon-mem SHALL default to "key." solon-mem MUST NOT use a three-tier or multi-tier classification system.
 
 #### Scenario: Classify an architectural decision as key
-- **WHEN** solon-mem receives a decision about system architecture (e.g., "use push model over pull model")
+- **WHEN** solon-mem receives a decision about system structure (e.g., "use push model over pull model", "hierarchical event filter with wildcards", "batch ingress per invocation instead of per-decision")
+- **THEN** solon-mem classifies it as "key"
+
+#### Scenario: Classify a data-flow or API boundary decision as key
+- **WHEN** solon-mem receives a decision that determines how data moves between components or defines an interface contract (e.g., "structured payload format for Clio dispatch", "single staging file per spec")
 - **THEN** solon-mem classifies it as "key"
 
 #### Scenario: Classify a straightforward decision as routine
-- **WHEN** solon-mem receives a decision that was accepted without debate (e.g., "use kebab-case for file names")
+- **WHEN** solon-mem receives a decision that was accepted without debate and does not affect system structure (e.g., "use kebab-case for file names", "include timestamp in header")
 - **THEN** solon-mem classifies it as "routine"
 
 #### Scenario: Classify an evolved decision as key
 - **WHEN** solon-mem receives a decision that supersedes a prior decision from the same session
+- **THEN** solon-mem classifies it as "key"
+
+#### Scenario: Default ambiguous classification to key
+- **WHEN** solon-mem cannot confidently determine whether a decision is routine or key
 - **THEN** solon-mem classifies it as "key"
 
 ### Requirement: Session ID resolution
@@ -37,7 +45,7 @@ solon-mem SHALL obtain the Claude session ID from the conversation context. In C
 - **THEN** the same session ID is used for all staging entries, Clio dispatches, checkpoint files, and the staging file header for the duration of the session
 
 ### Requirement: Local staging file persistence
-solon-mem SHALL write every decision to a local staging file at `.solon/staging/{spec-name}.md`. The staging file MUST be written regardless of Clio availability. Each entry MUST include: a sequential decision ID (D-001, D-002, ...), the current phase, classification (key/routine), Claude session ID, verbose context with raw conversation excerpts and quoted user/assistant statements, and the decision text.
+solon-mem SHALL write every decision from the caller's prompt to a local staging file at `.solon/staging/{spec-name}.md`. The staging file MUST be written regardless of Clio availability. solon-mem MUST process ALL decisions provided in a single invocation — it MUST NOT return after writing only the first decision. Processing follows three phases: setup (file creation or session handling), iteration (write each decision entry), and completion (verify count and proceed to Clio dispatch). Each entry MUST include: a sequential decision ID (D-001, D-002, ...), the current phase, classification (key/routine), Claude session ID, verbose context with raw conversation excerpts and quoted user/assistant statements, and the decision text.
 
 #### Scenario: Write first decision to staging file
 - **WHEN** solon-mem stages a decision for a spec named "api-gateway" and no staging file exists
@@ -47,8 +55,17 @@ solon-mem SHALL write every decision to a local staging file at `.solon/staging/
 - **WHEN** solon-mem stages a second decision for spec "api-gateway" and the staging file already exists with D-001
 - **THEN** solon-mem appends the decision as entry D-002 to the existing staging file
 
+#### Scenario: Process all decisions in a single invocation
+- **WHEN** solon-mem receives a prompt containing 4 decisions to stage
+- **THEN** solon-mem writes all 4 entries (D-001 through D-004, or continuing from the last existing ID) to the staging file before proceeding to Clio dispatch
+- **AND** solon-mem does NOT return or yield control after writing fewer than 4 entries
+
+#### Scenario: Completion verification
+- **WHEN** solon-mem finishes writing decision entries
+- **THEN** solon-mem verifies the count of entries written matches the count of decisions received and reports: "Staged N decisions (D-001 through D-NNN)"
+
 #### Scenario: Resume same session with existing staging file
-- **WHEN** solon-mem stages a decision for spec "api-gateway" and a staging file exists whose header session ID matches the current session ID
+- **WHEN** solon-mem stages decisions for spec "api-gateway" and a staging file exists whose header session ID matches the current session ID
 - **THEN** solon-mem appends to the existing staging file, continuing the decision ID sequence
 
 #### Scenario: New session with existing staging file from different session
@@ -78,24 +95,28 @@ solon-mem SHALL track when a new decision supersedes a prior decision within the
 - **WHEN** a decision is superseded
 - **THEN** the original decision entry content is preserved in the staging file (not deleted or overwritten)
 
-### Requirement: Clio dispatch per decision
-solon-mem SHALL dispatch each staged decision to Clio immediately after writing it to the staging file. The dispatch MUST include: decision title, classification (key/routine), session ID, group_id, context (verbose excerpt), and decision text. If the decision supersedes a prior one, the dispatch MUST include the supersedes reference. The group_id is determined by solon-mem from the project's .graphiti/config.yaml or from the caller's context. If group_id cannot be determined, solon-mem SHALL still write to the staging file but skip the Clio dispatch and log that group_id was unavailable.
+### Requirement: Clio batch dispatch per invocation
+solon-mem SHALL dispatch all staged decisions to Clio in a single background agent call after writing all entries to the staging file. The dispatch MUST use a structured batch payload containing: spec name, session ID, group_id, and a numbered list of decisions where each decision includes its title, classification (key/routine), context (verbose excerpt), decision text, and supersedes reference (if applicable). The group_id is determined by solon-mem from the project's .graphiti/config.yaml or from the caller's context. If group_id cannot be determined, solon-mem SHALL still write to the staging file but skip the Clio dispatch and log that group_id was unavailable. solon-mem MUST NOT dispatch Clio more than once per invocation.
 
-#### Scenario: Dispatch decision to Clio when available
-- **WHEN** solon-mem stages a decision and Clio is available and group_id is known
-- **THEN** solon-mem dispatches the decision to Clio with all required fields including group_id
+#### Scenario: Batch dispatch to Clio when available
+- **WHEN** solon-mem stages 4 decisions and Clio is available and group_id is known
+- **THEN** solon-mem dispatches a single Clio agent in the background with all 4 decisions in a structured batch payload
+
+#### Scenario: Batch payload structure
+- **WHEN** solon-mem dispatches to Clio
+- **THEN** the payload includes a header (spec name, session ID, group_id) and a numbered `Decisions:` list where each item contains title, classification, context, decision text, and optional supersedes reference
 
 #### Scenario: Skip Clio dispatch when group_id unavailable
-- **WHEN** solon-mem stages a decision but group_id cannot be determined from .graphiti/config.yaml or caller context
-- **THEN** solon-mem writes the decision to the staging file, skips the Clio dispatch, and logs that group_id was unavailable
+- **WHEN** solon-mem stages decisions but group_id cannot be determined from .graphiti/config.yaml or caller context
+- **THEN** solon-mem writes all decisions to the staging file, skips the Clio dispatch, and logs that group_id was unavailable
 
 #### Scenario: Graceful degradation when Clio is unavailable
-- **WHEN** solon-mem stages a decision and Clio is unavailable (dispatch fails or agent not found)
+- **WHEN** solon-mem stages decisions and Clio is unavailable (dispatch fails or agent not found)
 - **THEN** solon-mem continues without error; the staging file is the durable record
 
-#### Scenario: No batching of decisions
-- **WHEN** multiple decisions are made during a spec session
-- **THEN** each decision is dispatched to Clio individually as it is staged, not accumulated for batch dispatch
+#### Scenario: One dispatch per invocation
+- **WHEN** solon-mem processes multiple decisions in a single invocation
+- **THEN** solon-mem dispatches exactly one Clio agent call containing all decisions, not one call per decision
 
 ### Requirement: Phase 5 evolution summary
 solon-mem SHALL produce an evolution summary when invoked at Phase 5. The summary MUST be generated by reading the full staging file for the current spec. The summary MUST describe: which decisions evolved (were superseded and why), what was finalized, and the overall narrative arc of the session's decisions. solon-mem SHALL write the evolution summary to the staging file and dispatch it to Clio as an evolution summary (separate knowledge type from individual decisions).

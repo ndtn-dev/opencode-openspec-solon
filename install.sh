@@ -37,53 +37,56 @@ prompt_choice() {
 # ── Install functions ────────────────────────────────────────────────
 
 install_alias() {
-  local alias_line="alias solon='claude --agent solon'"
-  local fish_line="alias solon 'claude --agent solon'"
+  local alias_line="alias solon='claude --agent solon --effort max'"
+  local fish_line="alias solon 'claude --agent solon --effort max'"
   local added_shells=()
 
   # zsh
   if [[ -f "$HOME/.zshrc" ]]; then
-    if ! grep -qF "alias solon=" "$HOME/.zshrc" 2>/dev/null; then
+    if grep -qF "alias solon=" "$HOME/.zshrc" 2>/dev/null; then
+      sed -i "s|alias solon=.*|$alias_line|" "$HOME/.zshrc"
+      echo "  Updated alias in ~/.zshrc"
+    else
       echo "" >> "$HOME/.zshrc"
       echo "# Solon — OpenSpec design partner" >> "$HOME/.zshrc"
       echo "$alias_line" >> "$HOME/.zshrc"
       echo "  Added alias to ~/.zshrc"
-      added_shells+=("zsh")
-    else
-      echo "  Alias already in ~/.zshrc"
     fi
+    added_shells+=("zsh")
   fi
 
   # bash
   if [[ -f "$HOME/.bashrc" ]]; then
-    if ! grep -qF "alias solon=" "$HOME/.bashrc" 2>/dev/null; then
+    if grep -qF "alias solon=" "$HOME/.bashrc" 2>/dev/null; then
+      sed -i "s|alias solon=.*|$alias_line|" "$HOME/.bashrc"
+      echo "  Updated alias in ~/.bashrc"
+    else
       echo "" >> "$HOME/.bashrc"
       echo "# Solon — OpenSpec design partner" >> "$HOME/.bashrc"
       echo "$alias_line" >> "$HOME/.bashrc"
       echo "  Added alias to ~/.bashrc"
-      added_shells+=("bash")
-    else
-      echo "  Alias already in ~/.bashrc"
     fi
+    added_shells+=("bash")
   fi
 
   # fish
   local fish_conf="$HOME/.config/fish/config.fish"
   if [[ -f "$fish_conf" ]]; then
-    if ! grep -qF "alias solon " "$fish_conf" 2>/dev/null; then
+    if grep -qF "alias solon " "$fish_conf" 2>/dev/null; then
+      sed -i "s|alias solon .*|$fish_line|" "$fish_conf"
+      echo "  Updated alias in $fish_conf"
+    else
       echo "" >> "$fish_conf"
       echo "# Solon — OpenSpec design partner" >> "$fish_conf"
       echo "$fish_line" >> "$fish_conf"
       echo "  Added alias to $fish_conf"
-      added_shells+=("fish")
-    else
-      echo "  Alias already in $fish_conf"
     fi
+    added_shells+=("fish")
   fi
 
   if [[ ${#added_shells[@]} -gt 0 ]]; then
     echo ""
-    echo "  Restart your terminal or reload your shell config to activate the alias:"
+    echo "  Reload your shell to pick up the alias:"
     for shell in "${added_shells[@]}"; do
       case "$shell" in
         zsh)  echo "    zsh:  source ~/.zshrc" ;;
