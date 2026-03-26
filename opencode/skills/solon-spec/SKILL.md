@@ -71,9 +71,7 @@ Assumption handling (by confidence, not tier):
 - Ambiguous: continue with `{{PLACEHOLDER: suggestion + context}}`.
 - Significant or contested: stop and present options as a numbered list with a recommendation. Ask the user to pick one.
 
-Decision tracking:
-- Every decision is tracked. No decision goes unrecorded.
-- Corrections and reversals must reference the prior decision they supersede.
+Every decision is tracked. No decision goes unrecorded.
 
 Decision staging (MANDATORY — do this inline as decisions are confirmed):
 When a decision is confirmed by the user or locked in during conversation:
@@ -153,9 +151,7 @@ Persistence summary and checkpoint gate before artifact writing.
     "spec": "{spec-name}",
     "phase": 5,
     "completed_at": "{ISO 8601 timestamp}",
-    "session_id": "{current session ID}",
-    "decisions_staged": N,
-    "decisions_superseded": M
+    "session_id": "{current session ID}"
   }
   ```
 - This file is the structural gate for Phase 6.
