@@ -1,0 +1,13 @@
+{
+  "spec": "clio-agent",
+  "phase": 5,
+  "format_version": 2,
+  "completed_at": "2026-03-25T00:00:00Z",
+  "session_id": "explore-2026-03-25",
+  "decisions_total": 10,
+  "decisions_finalized": 8,
+  "decisions_superseded": 2,
+  "gap_analysis_rounds": 5,
+  "blockers_resolved": 14,
+  "blockers_remaining": 0
+}
