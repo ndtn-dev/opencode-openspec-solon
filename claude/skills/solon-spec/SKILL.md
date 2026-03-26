@@ -65,9 +65,9 @@ Every decision is tracked. No decision goes unrecorded.
 
 Decision staging (MANDATORY — do this inline as decisions are confirmed):
 When a decision is confirmed by the user or locked in during conversation:
-1. Immediately invoke the `solon-mem` skill with: spec name, phase, decision title, context (quoted user statements), and decision text.
+1. Use the Skill tool to invoke `solon-mem` with a prompt containing: spec name, phase, decision title, context (quoted user statements), and decision text.
 2. If the decision corrects, reverses, or replaces a prior one, include the prior decision ID as a supersedes reference.
-3. Do NOT batch or defer — stage each decision as it is confirmed.
+3. Do NOT batch or defer — stage each decision as it is confirmed. Do NOT write to `.solon/staging/` directly; solon-mem owns that file.
 4. solon-mem handles classification (key/routine), writes to `.solon/staging/`, and dispatches to Clio in the background.
 
 Holistic thinking requirements:
@@ -130,7 +130,7 @@ Phase 5 cannot run until this summary state is explicit.
 Persistence summary and checkpoint gate before artifact writing.
 
 1) Read the staging file at `.solon/staging/{spec-name}.md`.
-2) Invoke `solon-mem` to produce an evolution summary (solon-mem reads the staging file, writes the summary to it, and dispatches to Clio if available).
+2) Use the Skill tool to invoke `solon-mem` with a prompt requesting an evolution summary for the spec. solon-mem reads the staging file, writes the summary to it, and dispatches to Clio if available.
 3) Present the summary to the user: how many decisions were staged, which evolved, and the overall narrative arc. This is informational — no confirmation gate, but the user should see what was captured.
 4) Write checkpoint file:
 - Ensure directory exists: `.solon/checkpoints/`
