@@ -63,11 +63,11 @@ Assumption handling (by confidence, not tier):
 
 Every decision is tracked. No decision goes unrecorded.
 
-Decision staging (MANDATORY — do this inline as decisions are confirmed):
-When a decision is confirmed by the user or locked in during conversation:
-1. Use the Skill tool to invoke `solon-mem` with a prompt containing: spec name, phase, decision title, context (quoted user statements), and decision text.
-2. If the decision corrects, reverses, or replaces a prior one, include the prior decision ID as a supersedes reference.
-3. Do NOT batch or defer — stage each decision as it is confirmed. Do NOT write to `.solon/staging/` directly; solon-mem owns that file.
+Decision staging (MANDATORY — do this when decisions are confirmed):
+When the user confirms one or more decisions:
+1. Use the Skill tool to invoke `solon-mem` with a prompt listing ALL newly confirmed decisions. For each decision include: spec name, phase, decision title, context (quoted user statements), and decision text.
+2. If any decision corrects, reverses, or replaces a prior one, include the prior decision ID as a supersedes reference.
+3. Do NOT write to `.solon/staging/` directly — solon-mem owns that file.
 4. solon-mem handles classification (key/routine), writes to `.solon/staging/`, and dispatches to Clio in the background.
 
 Holistic thinking requirements:

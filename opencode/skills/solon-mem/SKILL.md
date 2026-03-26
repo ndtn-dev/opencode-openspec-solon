@@ -6,7 +6,8 @@ description: Decision staging and optional Clio dispatch for Solon spec sessions
 # Solon Mem
 
 Adapter between Solon and Clio for decision persistence.
-Called by solon-spec during Phase 2 (per decision) and Phase 5 (evolution summary).
+Called by solon-spec to stage one or more decisions and dispatch to Clio.
+Also called at Phase 5 to produce an evolution summary.
 
 ## Session ID
 
@@ -23,30 +24,33 @@ Two tiers only:
 
 Do NOT use Big/Medium/Small or any other multi-tier system.
 
-## Staging a Decision
+## Staging Decisions
 
-Every decision writes to `.solon/staging/{spec-name}.md` regardless of Clio availability.
+The caller's prompt contains one or more decisions to stage. Process ALL of them — do not stop after the first.
+
+For each decision in the prompt, write an entry to `.solon/staging/{spec-name}.md`:
 
 1. Ensure `.solon/staging/` exists (create if needed).
 2. If a staging file exists for this spec:
    - **Same session ID in header** -> append, continuing the D-NNN sequence.
    - **Different session ID** -> archive the old file to `.solon/staging/{spec-name}.{old-session-id}.md`, then create a fresh file.
 3. If no staging file exists, create one with a header.
-4. Assign sequential ID: D-001, D-002, etc.
-5. Write the decision entry (see format below).
+4. Assign sequential IDs: D-001, D-002, etc. (continuing from the last entry if appending).
+5. Write ALL decision entries in one pass (see format below).
+6. After writing, dispatch to Clio (see below).
 
 ## Clio Dispatch
 
-After writing each decision to the staging file, dispatch to Clio:
+After writing all decisions to the staging file, dispatch to Clio once with all staged decisions:
 
 1. Determine `group_id` from `.graphiti/config.yaml` or caller context.
 2. If `group_id` is unavailable: skip dispatch, log that group_id was unavailable.
-3. Dispatch the `clio` agent with ingress intent, including:
-   - Decision title, classification (key/routine), session ID, group_id
+3. Dispatch the `clio` agent in the background with ingress intent, including all decisions from this invocation:
+   - Decision titles, classifications (key/routine), session ID, group_id
    - Verbose context (conversation excerpts)
-   - Decision text
-   - Supersedes reference (if applicable)
-4. Run dispatch in background — do not block the spec conversation.
+   - Decision text for each
+   - Supersedes references (if applicable)
+4. One Clio dispatch per solon-mem invocation, not per decision.
 
 ### Graceful Degradation
 
