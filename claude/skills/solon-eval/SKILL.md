@@ -47,7 +47,7 @@ Then wait for the user to paste Solon's response before evaluating.
 ### Test 4: Explicit
 **Prompt**: "Create a spec for adding WebSocket support to the API gateway"
 **Expected**: Routes to solon-spec. Begins exploration (Phase 1) then moves into brainstorming with incremental artifacts.
-**Pass if**: Starts by reading existing specs/codebase, then begins forming artifacts during conversation. Tracks assumptions.
+**Pass if**: Starts by reading existing specs/codebase, then begins forming artifacts during conversation. Tracks assumptions and stages decisions via solon-mem.
 **Fail if**: Asks clarifying questions instead of starting (that's Ambiguous routing). Or generates a complete spec monolith in one shot.
 
 ### Test 5: Plan-to-spec

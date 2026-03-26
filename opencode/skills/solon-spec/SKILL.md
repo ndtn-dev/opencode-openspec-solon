@@ -1,6 +1,6 @@
 ---
 name: solon-spec
-description: Core spec-writing workflow with 7-phase process, soft ratchet, and ingress dispatch
+description: Core spec-writing workflow with 6-phase process, soft ratchet, and solon-mem dispatch
 compatibility: opencode
 metadata:
   category: spec
@@ -15,13 +15,12 @@ metadata:
 
 # Solon Spec
 Use this skill on the main Solon agent after Phase 0 routing.
-Scope: run the complete 7-phase spec workflow from exploration through write verification.
+Scope: run the complete 6-phase spec workflow from exploration through artifact writing.
 Hard boundaries:
 - No Phase 0 intent gate logic.
 - No base-agent identity/role text.
 - No code implementation or deployment execution.
 - No reconcile triage category engine (that stays in `solon-reconcile`).
-- No redefinition of full ingress internals (that stays in `solon-ingress`).
 
 ## Phase 1: Exploration
 Run exploration before brainstorming or writing.
@@ -36,7 +35,7 @@ If any are missing: **STOP**. Report: "OpenSpec dependency missing. Run /solon-d
 Do NOT attempt direct-write fallback or proceed without the skills.
 
 1) Path resolution:
-- Use relative paths for all file operations: `openspec/`, `.sisyphus/`, `.solon/`, `.graphiti/`.
+- Use relative paths for all file operations: `openspec/`, `.sisyphus/`, `.solon/`.
 - Do not construct absolute paths from injected environment metadata (it may be incorrect).
 - If an absolute path is needed, resolve from the working directory, not from env strings.
 
@@ -51,11 +50,7 @@ Do NOT attempt direct-write fallback or proceed without the skills.
 4. Other planning artifacts: `.claude/plans/`, `PLAN.md`, `docs/rfcs/`, `docs/plans/`
 5. Relevant codebase files only
 
-4) Run decision tracking housekeeping:
-- Load `graphiti-ledger-status` and perform a lightweight session check.
-- If Postgres is unavailable, count `.graphiti/ingress/pending/` JSON fallbacks.
-
-5) Plan-to-spec conversion rules:
+4) Plan-to-spec conversion rules:
 - Motivation/context -> `proposal.md`
 - Architecture/constraints -> `design.md`
 - Implementation sequencing -> `tasks.md`
@@ -71,28 +66,22 @@ Clearance criteria must be woven naturally into dialogue:
 4. Technical approach
 5. Verification strategy
 
-Assumption tiers:
-- Small: proceed, queue for Phase 4 confirmation.
-- Medium: continue with `{{PLACEHOLDER: suggestion + context}}`.
-- Big: stop and present options as a numbered list with a recommendation. Ask the user to pick one.
+Assumption handling (by confidence, not tier):
+- Confident enough to proceed: accept and queue for Phase 4 confirmation.
+- Ambiguous: continue with `{{PLACEHOLDER: suggestion + context}}`.
+- Significant or contested: stop and present options as a numbered list with a recommendation. Ask the user to pick one.
 
-Decision tracking rules:
-- Every decision is tracked with phase/tier/status metadata.
-- Use `decision_status=active` for current decisions.
-- Corrections must link via `superseded_by`.
+Decision tracking:
+- Every decision is tracked. No decision goes unrecorded.
+- Corrections and reversals must reference the prior decision they supersede.
 
-Phase 2 micro-ingress for Big decisions only:
-1. Load `graphiti-ledger-insert`.
-2. Insert decision row with `phase=P2`, `tier=Big`, `decision_status=active`.
-3. Call `add_memory` for the confirmed Big decision.
-4. Keep GUID linkage in source metadata.
+Decision staging (MANDATORY — do this inline as decisions are confirmed):
+When a decision is confirmed by the user or locked in during conversation:
+1. Immediately invoke the `solon-mem` skill with: spec name, phase, decision title, context (quoted user statements), and decision text.
+2. If the decision corrects, reverses, or replaces a prior one, include the prior decision ID as a supersedes reference.
+3. Do NOT batch or defer — stage each decision as it is confirmed.
+4. solon-mem handles classification (key/routine), writes to `.solon/staging/`, and dispatches to Clio in the background.
 
-Big override handling:
-1. Record replacement decision via `graphiti-ledger-insert`.
-2. Link old -> new with `superseded_by`.
-3. Ingest correction rationale via `add_memory`.
-
-Small and Medium are not ingested in Phase 2; they are batch-ingested after Phase 4 in Phase 5.
 Holistic thinking requirements:
 - Surface second-order effects.
 - Check coherence with existing specs.
@@ -101,9 +90,8 @@ Holistic thinking requirements:
 ### Reconcile Mode (Phase 2 variant)
 When entering from reconcile intent:
 1. Enumerate every deviation between spec and implementation evidence.
-2. Classify each deviation as Small, Medium, or Big.
-3. Micro-ingest confirmed Big deviations immediately using the same Phase 2 Big path.
-4. Queue Small/Medium deviations for Phase 4 confirmation and Phase 5 batch ingestion.
+2. For each confirmed deviation, invoke `solon-mem` (classifies as key/routine and stages).
+3. Queue unconfirmed deviations for Phase 4 confirmation and Phase 5 finalization.
 
 Reconcile note: this is deviation handling, not triage taxonomy generation.
 ## Phase 3: Gap Analysis (Mandatory)
@@ -141,7 +129,7 @@ Surface consolidated checkpoint state:
 - Confirmed assumptions
 - Remaining placeholders
 - Phase 3 findings (`blocking` / `warning` / `note`)
-- Candidate overrides that supersede prior decisions
+- Decisions that evolved during conversation (superseded earlier decisions)
 
 User may:
 - Confirm all
@@ -150,47 +138,24 @@ User may:
 - Request targeted return to Phase 2
 
 Phase 5 cannot run until this summary state is explicit.
-## Phase 5: Ingress Checkpoint (Verify)
-This is the persistence and verification gate before artifact writing.
-1) Verify Phase 2 records:
-- Load `graphiti-ledger-status` and verify current-session rows.
-- Capture verified vs pending counts.
+## Phase 5: Finalize
+Persistence summary and checkpoint gate before artifact writing.
 
-2) Batch-record confirmed Small/Medium decisions:
-- Load `graphiti-ledger-insert`.
-- Insert confirmed Small/Medium assumptions for first-time ingestion tracking.
-- Apply `superseded_by` links for overrides.
-
-3) All-tier ingestion policy (Decision #19):
-- Graph ingestion happens via `add_memory` through the `solon-ingress` + `graphiti-normalizer` path.
-- Big decisions: already ingested in Phase 2 micro-ingress -> skip duplicate graph ingestion in Phase 5.
-- Medium decisions: graph-ingested for first time in Phase 5.
-- Small decisions: graph-ingested for first time in Phase 5.
-- All tiers: ledger records are verified at Phase 5.
-
-4) Dispatch solon-ingress:
-```python
-task(
-  category='unspecified-high',
-  load_skills=['solon-ingress', 'graphiti-enhancer', 'graphiti-ledger-insert', 'graphiti-normalizer'],
-  run_in_background=true,
-  prompt='INGRESS CHECKPOINT BATCH: process confirmed Phase 5 decisions, enforce Decision #19 all-tier ingestion, skip Big graph duplicates already ingested in Phase 2, return enhanced/dropped/ingested summary with errors if any.'
-)
-```
-Depth guard:
-- Do not spawn sub-sub-agents from this path.
-
-5) Write checkpoint file:
+1) Read the staging file at `.solon/staging/{spec-name}.md`.
+2) Invoke `solon-mem` to produce an evolution summary (solon-mem reads the staging file, writes the summary to it, and dispatches to Clio if available).
+3) Present the summary to the user: how many decisions were staged, which evolved, and the overall narrative arc. This is informational — no confirmation gate, but the user should see what was captured.
+4) Write checkpoint file:
 - Ensure directory exists: `.solon/checkpoints/`
 - Write `.solon/checkpoints/{spec-name}-phase5.json`:
   ```json
   {
+    "format_version": 2,
     "spec": "{spec-name}",
     "phase": 5,
     "completed_at": "{ISO 8601 timestamp}",
     "session_id": "{current session ID}",
-    "decisions_ingested": N,
-    "decisions_dropped": M
+    "decisions_staged": N,
+    "decisions_superseded": M
   }
   ```
 - This file is the structural gate for Phase 6.
@@ -199,11 +164,8 @@ Depth guard:
 Phase 6 is locked once writing begins.
 Pre-write gate (hard stop):
 1. Check for `.solon/checkpoints/{spec-name}-phase5.json`.
-   - If missing: STOP. Report: "Phase 5 checkpoint missing. Run Phase 5 ingress before writing artifacts."
-   - If present: read and log the checkpoint summary.
-2. Query `execute_sql` for current-session episode count (secondary verification).
-3. If zero, check `.graphiti/ingress/pending/` fallback JSON count.
-4. If both are zero, stop and report checkpoint failure.
+   - If missing: STOP. Report: "Phase 5 checkpoint missing. Run Phase 5 before writing artifacts."
+   - If present: read and log the checkpoint summary. Accept both `format_version: 2` (current) and legacy checkpoints (no format_version field).
 
 Write sequence — sub-agent delegation:
 Dispatch a sub-agent via the Agent tool with Bash access. The sub-agent:
@@ -222,20 +184,13 @@ Locked-state rule:
 - No return to brainstorm while current write pass is active.
 - If interrupted, finish current write unit, then loop back to Phase 2.
 
-## Phase 7: Verify and Nudge
-1. Fire ledger status pass via `graphiti-ledger-status` (`all`: drain, verify, report) as background:
-   ```
-   task(category='quick', load_skills=['graphiti-ledger-status'], run_in_background=true, prompt='CHECK LEDGER STATUS: all for session {session_id}')
-   ```
-2. Immediately nudge toward Handoff intent (do not wait for verify result):
-   - `Specs are locked. Want me to generate a handoff document for implementation?`
-3. If the background verify completes while the user is still in session, surface the summary as informational context.
+Post-write nudge:
+- After artifact writing completes, nudge toward Handoff intent:
+  `Specs are locked. Want me to generate a handoff document for implementation?`
 
 Topic-switch rule:
 - If the user changes topic mid-flow, yield to Phase 0 routing and stop treating this skill as active framework.
 ## Integrity Rules
 
-- Preserve phase integrity: Phase 3 mandatory, Phase 5 gates Phase 6, Phase 6 locked.
-- Never skip decision tracking before write.
-- Never duplicate Big graph ingestion already completed in Phase 2.
-- Keep ledger state, graph ingestion state, and artifact content aligned.
+- Phase 3 is mandatory; Phase 5 gates Phase 6; Phase 6 is locked once writing begins.
+- Never skip decision staging (via solon-mem) before write.

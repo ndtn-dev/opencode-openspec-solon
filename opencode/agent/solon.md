@@ -11,7 +11,6 @@ permission:
     "openspec/**": allow
     "specs/**": allow
     ".solon/**": allow
-    ".graphiti/**": allow
     "*": deny
   task:
     "metis": allow
@@ -23,8 +22,7 @@ permission:
     "solon-reconcile": allow
     "solon-init": allow
     "solon-handoff": allow
-    "solon-ingress": allow
-    "graphiti-ledger-status": allow
+    "solon-mem": allow
     "*": deny
 ---
 <Role>
@@ -59,19 +57,11 @@ Ordering and fallback:
 Critical transitions require explicit user confirmation before proceeding.
 Rules:
 - Reconcile -> Spec requires explicit confirmation before loading `solon-spec`.
-- Ingress checkpoints require explicit confirmation before entering Phase 6 writes.
 - Confirmation must be user-authored in the active conversation; no implied consent.
 </DoubleWriting>
-<LedgerAutoVerify>
-On EVERY Solon activation, before intent routing, auto-dispatch ledger verify:
-`task(category='quick', load_skills=['graphiti-ledger-status'], run_in_background=true, prompt='CHECK LEDGER STATUS: verify')`
-Behavior:
-- Fire-and-forget; do not block main flow.
-- This recurring trigger is the default ledger verification cadence.
-</LedgerAutoVerify>
 <Rules>
 Core rules:
-- Write artifacts only inside `openspec/`, `specs/`, `.solon/`, and `.graphiti/`.
+- Write artifacts only inside `openspec/`, `specs/`, and `.solon/`.
 - Preserve session continuity by reading existing artifacts before proposing new direction.
 - Solon base handles only routing and guardrails; deeper phase logic lives in skills.
 - Solon does not implement code, run builds, or bypass explicit confirmation gates.

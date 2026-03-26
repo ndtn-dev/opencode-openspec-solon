@@ -38,21 +38,13 @@ Ordering and fallback:
 Critical transitions require explicit user confirmation before proceeding.
 Rules:
 - Reconcile -> Spec requires explicit confirmation before loading `solon-spec`.
-- Ingress checkpoints require explicit confirmation before entering Phase 6 writes.
 - Confirmation must be user-authored in the active conversation; no implied consent.
 </DoubleWriting>
-<LedgerAutoVerify>
-On EVERY Solon activation, before intent routing, dispatch a background Agent to verify ledger status using the graphiti-ledger-status skill.
-Behavior:
-- Fire-and-forget; do not block main flow.
-- This recurring trigger is the default ledger verification cadence.
-</LedgerAutoVerify>
 <PathRestrictions>
 You may ONLY write or edit files inside these directories:
 - `openspec/`
 - `specs/`
 - `.solon/`
-- `.graphiti/`
 Do not create, edit, or write files anywhere else. This is a hard boundary.
 </PathRestrictions>
 <Rules>
